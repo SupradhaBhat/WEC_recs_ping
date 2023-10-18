@@ -5,9 +5,11 @@ import struct
 import select
 import time
 
+
 ICMP_ECHO_REQUEST = 8 #ICMP type number for echo request
 TIME_OUT = 2
 NUMBER_OF_PINGS = 4 
+
 
 class Pinger(object):
     #Send a ping to some host using an ICMP echo request
@@ -16,6 +18,30 @@ class Pinger(object):
         self.target_host = target_host
         self.count = count
         self.timeout = timeout
+
+
+    def chksum(self, input_string):
+        sum = 0 
+        max_count = (len(input_string)/2)*2 #Length of our checksum string
+        count = 0
+        while count < max_count: #loop through checksum string
+
+            val = input_string[count + 1]*256 + input_string[count]        
+
+            sum = sum + val
+            sum = sum & 0xffffffff 
+            count = count + 2
+     
+        if max_count<len(input_string): #If our source string is larger than our max string length...
+            sum = sum + ord(input_string[len(input_string) - 1])
+            sum = sum & 0xffffffff 
+     
+        sum = (sum >> 16)  +  (sum & 0xffff)
+        sum = sum + (sum >> 16)
+        answer = ~sum
+        answer = answer & 0xffff
+        answer = answer >> 8 | (answer << 8 & 0xff00)
+        return answer
  
     def receive_response(self, sock, ID, time_out):
         """
@@ -47,9 +73,56 @@ class Pinger(object):
             time_left = time_left - time_spent
             if time_left <= 0:
                 return
-            
-    #ping_once - function to ping once
-    #receive_response - function to get the delay and inturn the RTT
+     
+     
+    def send_ping(self, sock,  ID):
+        """
+        Here we create a dummy ICMP packet and attaching it to the IP header. 
+        """
+        target_addr  =  socket.gethostbyname(self.target_host) # set address variable to target address.
+     
+        my_checksum = 0 #Create a dummy checksum with value zero.
+     
+        # Create a dummy header with a zero checksum.
+        header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, my_checksum, ID, 1)
+        bytes_In_double = struct.calcsize("d")
+        data = (192 - bytes_In_double) * "Q"
+        data = struct.pack("d", time.time()) + bytes(data.encode())
+     
+        # Get the checksum on the data and the dummy header.
+        my_checksum = self.chksum(header + data)
+        header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, socket.htons(my_checksum), ID, 1)
+        
+        #add the data from above to the header to create a complete packet
+        packet = header + data
+        #send the packet to the target address
+        sock.sendto(packet, (target_addr, 1))
+     
+     
+    def ping_once(self):
+        """
+        Returns the delay (in seconds) or none on timeout.
+        """
+        icmp = socket.getprotobyname("icmp")
+        try:
+        #add the ipv4 socket (same as we did in our first project, SOCK_RAW(to bypass some of the TCP/IP handling by your OS) and the ICMP packet
+            sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
+        except socket.error as e:
+            if e.errno == 1:
+                # print a messege if not run by superuser/admin, so operation is not permitted
+                e.msg +=  "Not permitted. User is not superuser/admin."
+                raise socket.error(e.msg)
+        except Exception as e:
+            #print the errror messege    
+            print ("Exception: %s" %(e.msg))
+    
+        my_ID = os.getpid() & 0xFFFF
+        
+        #Call the definition from send.ping above and send to the socket you created above
+        self.send_ping(sock , my_ID)
+        delay = self.receive_response(sock, my_ID, self.timeout)
+        sock.close()
+        return delay
      
      
     def ping(self):
