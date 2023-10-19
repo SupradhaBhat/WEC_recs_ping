@@ -1,24 +1,28 @@
-import os 
-import argparse 
+import os
+import argparse
 import socket
 import struct
 import select
 import time
 
-
-ICMP_ECHO_REQUEST = 8 #ICMP type number for echo request
+ICMP_ECHO_REQUEST = 8  # ICMP type number for echo request
 TIME_OUT = 2
-NUMBER_OF_PINGS = 4 
+NUMBER_OF_PINGS = 4
+
+universal = 0  # Add this variable to keep track of the sum of RTTs
+maxi = 0
+minimum = 100000000000
 
 
 class Pinger(object):
-    #Send a ping to some host using an ICMP echo request
+    # Send a ping to some host using an ICMP echo request
     def __init__(self, target_host, count=NUMBER_OF_PINGS, timeout=TIME_OUT):
-	#Initilize values of target_host, count, and timeout
+        # Initialize values of target_host, count, and timeout
         self.target_host = target_host
         self.count = count
         self.timeout = timeout
 
+    # ... (Rest of your code remains the same)
 
     def chksum(self, input_string):
         sum = 0 
@@ -123,33 +127,49 @@ class Pinger(object):
         delay = self.receive_response(sock, my_ID, self.timeout)
         sock.close()
         return delay
-     
-     
+
     def ping(self):
         """
         It iterates for the specified number of pings (default: 4), sending pings and printing the results.
         """
-        for i in range(self.count):
-            print ("Ping to %s..." % self.target_host,)
-            try:
-                delay  =  self.ping_once()
-            except socket.gaierror as e:
-                print ("Ping failed. (socket error: '%s')" % e[1])
-                break
-     
-            if delay  ==  None:
-                print ("Ping failed. (timeout within %ssec.)" % self.timeout)
-            else:
-                delay  =  delay * 1000
-                print ("Delay is : %0.4fms" % delay)
-                print ("RTT is : %0.4fms" % (delay*2))
+        global universal  # Access the global variable
+        global maxi
+        global minimum
 
- 
- 
+        for i in range(self.count):
+            print("Ping to %s..." % self.target_host, )
+            try:
+                delay = self.ping_once()
+            except socket.gaierror as e:
+                print("Ping failed. (socket error: '%s')" % e[1])
+                break
+
+            if delay == None:
+                print("Ping failed. (timeout within %s sec.)" % self.timeout)
+            else:
+                delay = delay * 1000
+                print("Delay is : %0.4f ms" % delay)
+                print("RTT is : %0.4f ms" % (delay * 2))
+
+                universal += delay  # Add the delay to the sum
+                maxi=max(maxi,delay)
+                minimum=min(minimum,delay)
+
+        if self.count > 0:
+            average_rtt = universal / self.count  # Calculate the average RTT
+            print(f"The average RTT is : {average_rtt}")
+        if self.count > 0:
+            maxi=max(maxi,delay)
+            print(f"The maximum RTT is : {maxi*2}")
+        if self.count > 0:
+            minimum=min(minimum,delay)
+            print(f"The minimum RTT is : {minimum*2}")
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Custom python ping command using ICMP sockets')
     parser.add_argument('--target-host', action="store", dest="target_host", required=True)
-    given_args = parser.parse_args()  
+    given_args = parser.parse_args()
     target_host = given_args.target_host
     pinger = Pinger(target_host=target_host)
     pinger.ping()
