@@ -155,7 +155,6 @@ class Pinger(object):
                 print("Ping failed. (timeout within %s sec.)" % self.timeout)
             else:
                 delay = delay * 1000
-                print("Delay is : %0.4f ms" % delay)
                 print("RTT is : %0.4f ms" % (delay * 2))
 
                 universal += delay  # Add the delay to the sum
@@ -164,7 +163,7 @@ class Pinger(object):
 
         if self.count > 0:
             average_rtt = universal / self.count  # Calculate the average RTT
-            print(f"The average RTT is : {average_rtt}")
+            print(f"The average RTT is : {average_rtt*2}")
         if sent_pings > 0:
             packet_loss = ((sent_pings - received_pings) / sent_pings) * 100
             print(f"Packet Loss: {packet_loss:.2f}%")
