@@ -12,6 +12,8 @@ NUMBER_OF_PINGS = 4
 universal = 0  # Add this variable to keep track of the sum of RTTs
 maxi = 0
 minimum = 100000000000
+sent_pings = 0
+received_pings = 0
 
 
 class Pinger(object):
@@ -135,11 +137,16 @@ class Pinger(object):
         global universal  # Access the global variable
         global maxi
         global minimum
+        global sent_pings
+        global received_pings
 
         for i in range(self.count):
             print("Ping to %s..." % self.target_host, )
             try:
+                sent_pings += 1
                 delay = self.ping_once()
+                if delay is not None:
+                    received_pings += 1
             except socket.gaierror as e:
                 print("Ping failed. (socket error: '%s')" % e[1])
                 break
@@ -158,6 +165,9 @@ class Pinger(object):
         if self.count > 0:
             average_rtt = universal / self.count  # Calculate the average RTT
             print(f"The average RTT is : {average_rtt}")
+        if sent_pings > 0:
+            packet_loss = ((sent_pings - received_pings) / sent_pings) * 100
+            print(f"Packet Loss: {packet_loss:.2f}%")
         if self.count > 0:
             maxi=max(maxi,delay)
             print(f"The maximum RTT is : {maxi*2}")
